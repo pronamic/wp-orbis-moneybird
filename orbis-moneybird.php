@@ -30,6 +30,10 @@ add_action(
 		if ( post_type_exists( 'orbis_company' ) ) {
 			add_post_type_support( 'orbis_company', 'pronamic_moneybird_contact' );
 		}
+
+		if ( post_type_exists( 'orbis_subs_product' ) ) {
+			add_post_type_support( 'orbis_subs_product', 'pronamic_moneybird_product' );
+		}
 	},
 	200
 );
