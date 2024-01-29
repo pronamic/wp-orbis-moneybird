@@ -61,12 +61,6 @@ add_action(
 			return;
 		}
 
-		$contact_id = get_post_meta( get_post_field( 'ID' ), '_pronamic_moneybird_contact_id', true );
-
-		if ( '' === $contact_id ) {
-			return;
-		}
-
 		include __DIR__ . '/templates/contact-card.php';
 	}
 );
