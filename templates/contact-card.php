@@ -17,11 +17,11 @@ $contact_id        = get_post_meta( get_post_field( 'ID' ), '_pronamic_moneybird
 
 ?>
 <div class="card mt-3">
-	<div class="card-header"><?php esc_html_e( 'Moneybrid', 'orbis-moneybrid' ); ?></div>
+	<div class="card-header"><?php esc_html_e( 'Moneybird', 'orbis-moneybird' ); ?></div>
 
 	<div class="card-body">
 		<dl>
-			<dt><?php esc_html_e( 'Contact ID', 'orbis-moneybrid' ); ?></dt>
+			<dt><?php esc_html_e( 'Contact ID', 'orbis-moneybird' ); ?></dt>
 			<dd>
 				<?php
 
