@@ -27,6 +27,9 @@
 add_action(
 	'init',
 	function () {
+		if ( post_type_exists( 'orbis_company' ) ) {
+			add_post_type_support( 'orbis_company', 'pronamic_moneybird_contact' );
+		}
 	},
 	200
 );
