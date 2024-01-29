@@ -12,8 +12,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+$authorization_id = get_option( 'pronamic_moneybird_authorization_post_id' );
+
 $administration_id = '';
-$contact_id        = get_post_meta( get_post_field( 'ID' ), '_pronamic_moneybird_contact_id', true );
+
+if ( '' !== $authorization_id ) {
+	$administration_id = get_post_meta( (int) $authorization_id, '_pronamic_moneybird_administration_id', true );
+}
+
+$contact_id = get_post_meta( get_post_field( 'ID' ), '_pronamic_moneybird_contact_id', true );
 
 ?>
 <div class="card mt-3">
