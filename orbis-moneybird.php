@@ -49,3 +49,24 @@ add_action(
 	},
 	200
 );
+
+add_action(
+	'orbis_after_side_content',
+	function () {
+		if ( ! is_singular() ) {
+			return;
+		}
+
+		if ( ! post_type_supports( get_post_field( 'post_type' ), 'pronamic_moneybird_contact' ) ) {
+			return;
+		}
+
+		$contact_id = get_post_meta( get_post_field( 'ID' ), '_pronamic_moneybird_contact_id', true );
+
+		if ( '' === $contact_id ) {
+			return;
+		}
+
+		include __DIR__ . '/templates/contact-card.php';
+	}
+);
