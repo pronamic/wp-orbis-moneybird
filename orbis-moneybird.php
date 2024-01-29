@@ -27,10 +27,22 @@
 add_action(
 	'init',
 	function () {
+		/**
+		 * Orbis Companies.
+		 * 
+		 * @link https://github.com/pronamic/wp-orbis-companies/commit/7da50a62313b77de7dc831f854b0fd08b6063d7f
+		 * @link https://github.com/pronamic/wp-pronamic-moneybird
+		 */
 		if ( post_type_exists( 'orbis_company' ) ) {
 			add_post_type_support( 'orbis_company', 'pronamic_moneybird_contact' );
 		}
 
+		/**
+		 * Orbis Subscriptions.
+		 * 
+		 * @link https://github.com/pronamic/wp-orbis-subscriptions/commit/5f0606c6f4ac01dea3bbdd0e25f058eaaec9a82d
+		 * @link https://github.com/pronamic/wp-pronamic-moneybird
+		 */
 		if ( post_type_exists( 'orbis_subs_product' ) ) {
 			add_post_type_support( 'orbis_subs_product', 'pronamic_moneybird_product' );
 		}
