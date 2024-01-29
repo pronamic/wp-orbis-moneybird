@@ -32,19 +32,35 @@ $contact_id = get_post_meta( get_post_field( 'ID' ), '_pronamic_moneybird_contac
 			<dd>
 				<?php
 
-				$url = \strtr(
-					'https://moneybird.com/:administration_id/contacts/:contact_id',
-					[
-						':administration_id' => $administration_id,
-						':contact_id'        => $contact_id,
-					]
-				);
+				if ( '' === $contact_id ) {
+					printf(
+						'<em>%s</em>',
+						esc_html__( 'No Moneybird contact ID set.', 'orbis-moneybird' )
+					);
+				}
 
-				printf(
-					'<a href="%s"><code>%s</code></a>',
-					esc_url( $url ),
-					esc_html( $contact_id )
-				);
+				if ( '' !== $contact_id && '' === $administration_id ) {
+					printf(
+						'<code>%s</code>',
+						esc_html( $contact_id )
+					);
+				}
+
+				if ( '' !== $contact_id && '' !== $administration_id ) {
+					$url = \strtr(
+						'https://moneybird.com/:administration_id/contacts/:contact_id',
+						[
+							':administration_id' => $administration_id,
+							':contact_id'        => $contact_id,
+						]
+					);
+
+					printf(
+						'<a href="%s"><code>%s</code></a>',
+						esc_url( $url ),
+						esc_html( $contact_id )
+					);
+				}
 
 				?>
 			</dd>
