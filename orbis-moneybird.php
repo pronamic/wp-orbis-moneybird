@@ -230,7 +230,15 @@ add_action(
 			$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
 
 			$date_start = DateTimeImmutable::createFromFormat( 'Y-m-d', $subscription->start_date )->setTime( 0, 0 );
-			$date_end   = $date_start->modify( '+1 year' )->modify( '-1 second' );
+
+			/**
+			 * In Orbis a subscription annual period is from, for example, 2005-01-01 to 2006-01-01 (exclusive).
+			 * In Moneybrid and accounting this actually runs from 2005-01-01 to 2005-12-31 (inclusive).
+			 * That's why we're moving the end date back one day.
+			 * 
+			 * @link https://taaladvies.net/tot-of-tot-en-met/
+			 */
+			$date_end = $date_start->modify( '+1 year' )->modify( '-1 day' );
 
 			$detail->description = \sprintf(
 				'%s · %s · %s',
