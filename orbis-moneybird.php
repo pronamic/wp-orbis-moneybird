@@ -260,6 +260,10 @@ add_action(
 add_action(
 	'pronamic_moneybird_sales_invoice_created',
 	function ( $sales_invoice ) {
+		global $wpdb;
+
+		$ids = [];
+
 		foreach ( $sales_invoice->details as $detail ) {
 			$result = \preg_match_all(
 				'/#subscription_(?P<subscription_id>[0-9]+)/',
@@ -276,6 +280,8 @@ add_action(
 			$period = ( null === $detail->period ) ? null : \Pronamic\Moneybird\Period::from_string( $detail->period );
 
 			foreach ( $subscription_ids as $subscription_id ) {
+				$ids[] = $subscription_id;
+
 				$invoice_data = [
 					'host'              => 'moneybird.com',
 					'id'                => $sales_invoice->id,
@@ -285,7 +291,27 @@ add_action(
 					'detail_id'         => $detail->id,
 				];
 
-				var_dump( $invoice_data );
+				$wpdb->insert(
+					$wpdb->orbis_subscriptions_invoices,
+					[
+						'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
+						'subscription_id' => $subscription_id,
+						'invoice_number'  => $sales_invoice->id,
+						'invoice_data'    => \wp_json_encode( $invoice_data ),
+						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
+						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
+						'user_id'         => get_current_user_id(),
+					],
+					[
+						'%s',
+						'%d',
+						'%s',
+						'%s',
+						'%s',
+						'%s',
+						'%d',
+					]
+				);
 			}
 		}
 	}
