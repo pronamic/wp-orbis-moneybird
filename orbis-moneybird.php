@@ -314,5 +314,55 @@ add_action(
 				);
 			}
 		}
+
+		$wpdb->query(
+			$wpdb->prepare(
+				sprintf(
+					"
+					UPDATE
+						$wpdb->orbis_subscriptions AS subscription
+							INNER JOIN
+						(
+							SELECT
+								subscription.id AS subscription_id,
+								subscription_invoice.id AS invoice_id,
+								subscription_invoice.created_at AS invoice_created_at,
+								subscription_invoice.start_date,
+								subscription_invoice.end_date
+							FROM
+								$wpdb->orbis_subscriptions AS subscription
+									INNER JOIN
+								$wpdb->orbis_subscriptions_invoices AS subscription_invoice
+										ON subscription_invoice.subscription_id = subscription.id
+									INNER JOIN
+								(
+									SELECT
+										subscription_invoice.subscription_id,
+										MAX( subscription_invoice.created_at ) AS created_at
+									FROM
+										$wpdb->orbis_subscriptions_invoices AS subscription_invoice
+									GROUP BY
+										subscription_invoice.subscription_id
+								) AS last_invoice
+										ON (
+											last_invoice.subscription_id = subscription_invoice.subscription_id
+												AND
+											last_invoice.created_at = subscription_invoice.created_at
+										)
+
+						) AS subscription_invoice_data
+							ON subscription.id = subscription_invoice_data.subscription_id
+					SET
+						subscription.billed_to = subscription_invoice_data.end_date,
+						subscription.expiration_date = subscription_invoice_data.end_date
+					WHERE
+						subscription.id IN ( %s )
+					;
+					",
+					\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
+				),
+				$ids
+			)
+		);
 	}
 );
