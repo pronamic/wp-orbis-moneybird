@@ -179,6 +179,7 @@ add_action(
 		}
 
 		$sales_invoice->contact_id = get_post_meta( $company->post_id, '_pronamic_moneybird_contact_id', true );
+		$sales_invoice->reference  = get_post_meta( $company->post_id, '_orbis_invoice_reference', true );
 	}
 );
 
@@ -226,7 +227,11 @@ add_action(
 			)
 		);
 
+		$subscription_references = [];
+
 		foreach ( $subscriptions as $subscription ) {
+			$subscription_references[] = $subscription_reference = '#subscription_' . $subscription->id;
+
 			$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
 
 			$date_start = DateTimeImmutable::createFromFormat( 'Y-m-d', $subscription->start_date )->setTime( 0, 0 );
@@ -244,7 +249,7 @@ add_action(
 				'%s · %s · %s',
 				$subscription->product_name,
 				$subscription->name,
-				'#subscription_' . $subscription->id
+				$subscription_reference
 			);
 
 			$detail->amount     = '1';
@@ -254,6 +259,14 @@ add_action(
 
 			$sales_invoice->details_attributes[] = $detail;
 		}
+
+		$references = [
+			$sales_invoice->reference ?? '',
+		];
+
+		$references[] = \implode( ', ', $subscription_references );
+
+		$sales_invoice->reference = implode( ' · ', \array_filter( $references ) );
 	}
 );
 
