@@ -212,6 +212,7 @@ add_action(
 						) AS start_date,
 						product.name AS product_name,
 						product.post_id AS product_post_id,
+						product.interval AS product_interval,
 						product.price
 					FROM
 						$wpdb->orbis_subscriptions AS subscription
@@ -236,6 +237,17 @@ add_action(
 
 			$date_start = DateTimeImmutable::createFromFormat( 'Y-m-d', $subscription->start_date )->setTime( 0, 0 );
 
+			switch ( $subscription->product_interval ) {
+				case 'M':
+					$date_end = $date_start->modify( '+1 month' );
+					break;
+				case 'Y':
+					$date_end = $date_start->modify( '+1 year' );
+					break;
+				default:
+					throw new Exception( 'Unsupported product interval: ' . $subscription->product_interval );
+			}
+
 			/**
 			 * In Orbis a subscription annual period is from, for example, 2005-01-01 to 2006-01-01 (exclusive).
 			 * In Moneybrid and accounting this actually runs from 2005-01-01 to 2005-12-31 (inclusive).
@@ -243,7 +255,7 @@ add_action(
 			 * 
 			 * @link https://taaladvies.net/tot-of-tot-en-met/
 			 */
-			$date_end = $date_start->modify( '+1 year' )->modify( '-1 day' );
+			$date_end = $date_end->modify( '-1 day' );
 
 			$detail->description = \sprintf(
 				'%s · %s · %s',
