@@ -272,11 +272,13 @@ add_action(
 			$sales_invoice->details_attributes[] = $detail;
 		}
 
-		$references = [
-			$sales_invoice->reference ?? '',
-		];
+		$references = [];
 
 		$references[] = \implode( ', ', $subscription_references );
+
+		if ( null !== $sales_invoice->reference && '' !== $sales_invoice->reference ) {
+			$references[] = $sales_invoice->reference;
+		}
 
 		$sales_invoice->reference = implode( ' · ', \array_filter( $references ) );
 	}
