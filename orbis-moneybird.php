@@ -202,6 +202,7 @@ add_action(
 					"
 					SELECT
 						subscription.id,
+						subscription.post_id,
 						subscription.name,
 						DATE(
 							COALESCE(
@@ -257,17 +258,19 @@ add_action(
 			 */
 			$date_end = $date_end->modify( '-1 day' );
 
-			$detail->description = \sprintf(
-				'%s · %s · %s',
-				$subscription->product_name,
-				$subscription->name,
-				$subscription_reference
-			);
+			$description_line = get_post_meta( $subscription->post_id, '_orbis_invoice_line_description', true );
 
-			$detail->amount     = '1';
-			$detail->price      = $subscription->price;
-			$detail->product_id = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_product_id', true );
-			$detail->period     = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
+			$description_parts = [
+				$subscription->product_name,
+				( '' === $description_line ) ? $subscription->name : $description_line,
+				$subscription_reference
+			];
+
+			$detail->description = \implode( ' · ', $description_parts );
+			$detail->amount      = '1';
+			$detail->price       = $subscription->price;
+			$detail->product_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_product_id', true );
+			$detail->period      = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
 
 			$sales_invoice->details_attributes[] = $detail;
 		}
