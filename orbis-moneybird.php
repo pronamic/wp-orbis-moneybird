@@ -396,3 +396,42 @@ add_action(
 		);
 	}
 );
+
+add_filter(
+	'orbis_invoice_url',
+	function ( $url, $data ) {
+		if ( '' === $data ) {
+			return $url;
+		}
+
+		$info = json_decode( $data );
+
+		if ( ! is_object( $info ) ) {
+			return $url;
+		}
+
+		if ( ! property_exists( $info, 'host' ) ) {
+			return $url;
+		}
+
+		if ( ! property_exists( $info, 'administration_id' ) ) {
+			return $url;
+		}
+
+		if ( ! property_exists( $info, 'id' ) ) {
+			return $url;
+		}
+
+		if ( 'moneybird.com' !== $info->host ) {
+			return $url;
+		}
+
+		return sprintf(
+			'https://moneybird.com/%s/sales_invoices/%s',
+			$info->administration_id,
+			$info->id
+		);
+	},
+	10,
+	2
+);
