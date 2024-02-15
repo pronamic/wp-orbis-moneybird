@@ -418,19 +418,32 @@ add_filter(
 			return $url;
 		}
 
-		if ( ! property_exists( $info, 'id' ) ) {
-			return $url;
-		}
-
 		if ( 'moneybird.com' !== $info->host ) {
 			return $url;
 		}
 
-		return sprintf(
-			'https://moneybird.com/%s/sales_invoices/%s',
-			$info->administration_id,
-			$info->id
-		);
+		if ( property_exists( $info, 'id' ) ) {
+			$url = sprintf(
+				'https://moneybird.com/%s/sales_invoices/%s',
+				$info->administration_id,
+				$info->id
+			);
+		}
+
+		if ( property_exists( $info, 'invoice_id' ) ) {
+			$url = add_query_arg(
+				[
+					'search_query' => $info->invoice_id,
+					'type_filter'  => 'sales_invoices',
+				],
+				sprintf(
+					'https://moneybird.com/%s/search',
+					$info->administration_id
+				)
+			);
+		}
+
+		return $url;
 	},
 	10,
 	2
