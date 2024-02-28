@@ -393,8 +393,7 @@ add_action(
 						) AS subscription_invoice_data
 							ON subscription.id = subscription_invoice_data.subscription_id
 					SET
-						subscription.billed_to = subscription_invoice_data.end_date,
-						subscription.expiration_date = subscription_invoice_data.end_date
+						subscription.billed_to = subscription_invoice_data.end_date
 					WHERE
 						subscription.id IN ( %s )
 					;
