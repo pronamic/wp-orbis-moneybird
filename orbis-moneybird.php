@@ -569,10 +569,10 @@ add_action(
 						(
 							SELECT
 								subscription.id AS subscription_id,
-								subscription_invoice.id AS invoice_id,
-								subscription_invoice.created_at AS invoice_created_at,
-								subscription_invoice.start_date,
-								subscription_invoice.end_date
+								invoice.id AS invoice_id,
+								invoice.created_at AS invoice_created_at,
+								invoice_line.start_date,
+								invoice_line.end_date
 							FROM
 								$wpdb->orbis_subscriptions AS subscription
 									INNER JOIN
