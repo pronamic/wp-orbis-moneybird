@@ -75,6 +75,29 @@ add_action(
 	}
 );
 
+\add_action(
+	'pronamic_moneybird_new_sales_invoice',
+	function ( $sales_invoice ) {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! \array_key_exists( 'orbis_company_id', $_GET ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$company_id = \sanitize_text_field( \wp_unslash( $_GET['orbis_company_id'] ) );
+
+		$company = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $wpdb->orbis_companies WHERE id = %d;", $company_id ) );
+
+		if ( null === $company ) {
+			return;
+		}
+
+		$sales_invoice->contact_id = get_post_meta( $company->post_id, '_pronamic_moneybird_contact_id', true );
+		$sales_invoice->reference  = get_post_meta( $company->post_id, '_orbis_invoice_reference', true );
+	}
+);
 
 \add_action(
 	'pronamic_moneybird_new_sales_invoice',
@@ -114,10 +137,10 @@ add_action(
 			FROM
 				$wpdb->orbis_projects AS project
 					INNER JOIN
-				wp_posts AS project_post
+				$wpdb->posts AS project_post
 						ON project.post_id = project_post.ID
 					INNER JOIN
-				wp_users AS manager
+				$wpdb->users AS manager
 						ON project_post.post_author = manager.ID
 					INNER JOIN
 				$wpdb->orbis_companies AS principal
@@ -154,42 +177,58 @@ add_action(
 		";
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$project = $wpdb->get_row( $query );
+		$item = $wpdb->get_row( $query );
 
-		if ( null === $project ) {
+		if ( null === $item ) {
 			return;
 		}
 
-		$sales_invoice->contact_id = \get_post_meta( $project->principal_post_id, '_pronamic_moneybird_contact_id', true );
+		$project_references = [];
 
-		echo '<pre>';
-		\var_dump( $project );
-		echo '</pre>';
-		exit;
-	}
-);
+		$project_references[] = $project_reference = '#project_' . $item->project_id;
 
-\add_action(
-	'pronamic_moneybird_new_sales_invoice',
-	function ( $sales_invoice ) {
-		global $wpdb;
+		$references = [];
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! \array_key_exists( 'orbis_company_id', $_GET ) ) {
-			return;
+		$references[] = \implode( ', ', $project_references );
+
+		$references[] = \get_post_meta( $item->project_post_id, '_orbis_invoice_reference', true );
+
+		if ( null !== $sales_invoice->reference && '' !== $sales_invoice->reference ) {
+			$references[] = $sales_invoice->reference;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$company_id = \sanitize_text_field( \wp_unslash( $_GET['orbis_company_id'] ) );
+		$sales_invoice->reference = implode( ' · ', \array_filter( $references ) );
 
-		$company = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $wpdb->orbis_companies WHERE id = %d;", $company_id ) );
+		$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
 
-		if ( null === $company ) {
-			return;
+		$date_start = DateTimeImmutable::createFromFormat( 'Y-m-d', \get_post_meta( $item->project_post_id, '_orbis_project_start_date', true ) );
+		$date_end   = DateTimeImmutable::createFromFormat( 'Y-m-d', \get_post_meta( $item->project_post_id, '_orbis_project_end_date', true ) );
+
+		$description_line = \get_post_meta( $item->project_post_id, '_orbis_invoice_line_description', true );
+
+		$hourly_rate = \get_post_meta( $item->project_post_id, '_orbis_hourly_rate', true );
+
+		$description_parts = [
+			$item->project_name,
+			$description_line,
+			$project_reference,
+		];
+
+		$detail->description = \implode( ' · ', \array_unique( \array_filter( $description_parts ) ) );
+		$detail->amount      = \orbis_time( $item->project_billable_time );
+		$detail->price       = $item->project_billable_amount;
+
+		if ( false !== $date_start && false !== $date_end ) {
+			$detail->period = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
 		}
 
-		$sales_invoice->contact_id = get_post_meta( $company->post_id, '_pronamic_moneybird_contact_id', true );
-		$sales_invoice->reference  = get_post_meta( $company->post_id, '_orbis_invoice_reference', true );
+		if ( false !== \strpos( $item->project_name, 'Online marketing' ) ) {
+			$detail->amount     = \orbis_time( $item->project_billable_time );
+			$detail->price      = $hourly_rate;
+			$detail->product_id = '411373237913519355';
+		}
+
+		$sales_invoice->details_attributes[] = $detail;
 	}
 );
 
@@ -294,6 +333,116 @@ add_action(
 		}
 
 		$sales_invoice->reference = implode( ' · ', \array_filter( $references ) );
+	}
+);
+
+
+add_action(
+	'pronamic_moneybird_sales_invoice_created',
+	function ( $sales_invoice ) {
+		global $wpdb;
+
+		$ids = [];
+
+		foreach ( $sales_invoice->details as $detail ) {
+			$result = \preg_match_all(
+				'/#project_(?P<project_id>[0-9]+)/',
+				$detail->description,
+				$matches
+			);
+
+			if ( false === $result ) {
+				continue;
+			}
+
+			$project_ids = \array_key_exists( 'project_id', $matches ) ? $matches['project_id'] : [];
+
+			$period = ( null === $detail->period ) ? null : \Pronamic\Moneybird\Period::from_string( $detail->period );
+
+			foreach ( $project_ids as $project_id ) {
+				$ids[] = $project_id;
+
+				$invoice_data = [
+					'host'              => 'moneybird.com',
+					'id'                => $sales_invoice->id,
+					'administration_id' => $sales_invoice->administration_id,
+					'contact_id'        => $sales_invoice->contact_id,
+					'draft_id'          => $sales_invoice->draft_id,
+					'detail_id'         => $detail->id,
+				];
+
+				$wpdb->insert(
+					$wpdb->orbis_projects_invoices,
+					[
+						'created_at'     => \gmdate( 'Y-m-d H:i:s' ),
+						'project_id'     => $project_id,
+						'invoice_number' => $sales_invoice->id,
+						'invoice_data'   => \wp_json_encode( $invoice_data ),
+						'start_date'     => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
+						'end_date'       => ( null === $period ) ? null : $period->end_date->format( 'Y-m-d' ),
+						'user_id'        => \get_current_user_id(),
+					],
+					[
+						'%s',
+						'%d',
+						'%s',
+						'%s',
+						'%s',
+						'%s',
+						'%d',
+					]
+				);
+			}
+		}
+
+		$wpdb->query(
+			$wpdb->prepare(
+				sprintf(
+					"
+					UPDATE
+						$wpdb->orbis_projects AS project
+							INNER JOIN
+						(
+							SELECT
+								project.id AS project_id,
+								project_invoice.id AS invoice_id,
+								project_invoice.created_at AS invoice_created_at,
+								project_invoice.start_date,
+								project_invoice.end_date
+							FROM
+								$wpdb->orbis_projects AS project
+									INNER JOIN
+								$wpdb->orbis_projects_invoices AS project_invoice
+										ON project_invoice.project_id = project.id
+									INNER JOIN
+								(
+									SELECT
+										project_invoice.project_id,
+										MAX( project_invoice.created_at ) AS created_at
+									FROM
+										$wpdb->orbis_projects_invoices AS project_invoice
+									GROUP BY
+										project_invoice.project_id
+								) AS last_invoice
+										ON (
+											last_invoice.project_id = project_invoice.project_id
+												AND
+											last_invoice.created_at = project_invoice.created_at
+										)
+
+						) AS project_invoice_data
+							ON project.id = project_invoice_data.project_id
+					SET
+						project.billed_to = project_invoice_data.end_date
+					WHERE
+						project.id IN ( %s )
+					;
+					",
+					\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
+				),
+				$ids
+			)
+		);
 	}
 );
 
