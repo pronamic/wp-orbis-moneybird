@@ -451,6 +451,57 @@ add_action(
 	function ( $sales_invoice ) {
 		global $wpdb;
 
+		$invoice_data = [
+			'host'              => 'moneybird.com',
+			'id'                => $sales_invoice->id,
+			'administration_id' => $sales_invoice->administration_id,
+			'contact_id'        => $sales_invoice->contact_id,
+			'draft_id'          => $sales_invoice->draft_id,
+		];
+
+		$orbis_invoice = $wpdb->get_row(
+			$wpdb->prepare(
+				"
+				SELECT
+					invoice.*
+				FROM
+					$wpdb->orbis_invoices AS invoice
+				WHERE
+					invoice.invoice_number = %s
+				LIMIT
+					1
+				;
+				",
+				$sales_invoice->id
+			)
+		);
+
+		$orbis_invoice_id = ( null === $orbis_invoice ) ? null : $orbis_invoice->id;
+
+		if ( null === $orbis_invoice ) {
+			$result = $wpdb->insert(
+				$wpdb->orbis_invoices,
+				[
+					'created_at'     => \gmdate( 'Y-m-d H:i:s' ),
+					'invoice_number' => $sales_invoice->id,
+					'invoice_data'   => \wp_json_encode( $invoice_data ),
+					'user_id'        => \get_current_user_id(),
+				],
+				[
+					'%s',
+					'%s',
+					'%s',
+					'%d',
+				]
+			);
+
+			if ( false === $result ) {
+				throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice into the Orbis database.' );
+			}
+
+			$orbis_invoice_id = $wpdb->insert_id;
+		}
+
 		$ids = [];
 
 		foreach ( $sales_invoice->details as $detail ) {
@@ -480,27 +531,31 @@ add_action(
 					'detail_id'         => $detail->id,
 				];
 
-				$wpdb->insert(
+				$result = $wpdb->insert(
 					$wpdb->orbis_subscriptions_invoices,
 					[
+						'invoice_id'      => $orbis_invoice_id,
 						'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
+						'line_number'     => $detail->id,
+						'line_data'       => \wp_json_encode( $invoice_data ),
 						'subscription_id' => $subscription_id,
-						'invoice_number'  => $sales_invoice->id,
-						'invoice_data'    => \wp_json_encode( $invoice_data ),
 						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
 						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
-						'user_id'         => get_current_user_id(),
 					],
 					[
-						'%s',
-						'%d',
-						'%s',
-						'%s',
-						'%s',
-						'%s',
-						'%d',
+						'invoice_id'      => '%d',
+						'created_at'      => '%s',
+						'line_number'     => '%s',
+						'line_data'       => '%s',
+						'subscription_id' => '%d',
+						'start_date'      => '%s',
+						'end_date'        => '%s',
 					]
 				);
+
+				if ( false === $result ) {
+					throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database.' );
+				}
 			}
 		}
 
@@ -521,22 +576,29 @@ add_action(
 							FROM
 								$wpdb->orbis_subscriptions AS subscription
 									INNER JOIN
-								$wpdb->orbis_subscriptions_invoices AS subscription_invoice
-										ON subscription_invoice.subscription_id = subscription.id
+								$wpdb->orbis_invoices_lines AS invoice_line
+										ON invoice_line.subscription_id = subscription.id
+									INNER JOIN
+								$wpdb->orbis_invoices AS invoice
+										ON invoice.id = invoice_line.invoice_id
 									INNER JOIN
 								(
 									SELECT
-										subscription_invoice.subscription_id,
-										MAX( subscription_invoice.created_at ) AS created_at
+										invoice_line.subscription_id,
+										MAX( invoice.created_at ) AS created_at
 									FROM
-										$wpdb->orbis_subscriptions_invoices AS subscription_invoice
+										$wpdb->orbis_invoices_lines AS invoice_line
+												ON invoice_line.subscription_id = subscription.id
+											INNER JOIN
+										$wpdb->orbis_invoices AS invoice
+												ON invoice.id = invoice_line.invoice_id
 									GROUP BY
-										subscription_invoice.subscription_id
+										invoice_line.subscription_id
 								) AS last_invoice
 										ON (
-											last_invoice.subscription_id = subscription_invoice.subscription_id
+											last_invoice.subscription_id = invoice_line.subscription_id
 												AND
-											last_invoice.created_at = subscription_invoice.created_at
+											last_invoice.created_at = invoice.created_at
 										)
 
 						) AS subscription_invoice_data
