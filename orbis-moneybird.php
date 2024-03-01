@@ -193,7 +193,7 @@ add_action(
 		$references = [];
 
 		$references[] = \implode( ', ', $project_references );
-
+		$references[] = $item->project_name;
 		$references[] = \get_post_meta( $item->project_post_id, '_orbis_invoice_reference', true );
 
 		if ( null !== $sales_invoice->reference && '' !== $sales_invoice->reference ) {
