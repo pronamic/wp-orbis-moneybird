@@ -342,6 +342,8 @@ add_action(
 	function ( $sales_invoice ) {
 		global $wpdb;
 
+		$orbis_invoice_id = orbis_moneybird_insert_sales_invoice( $sales_invoice );
+
 		$ids = [];
 
 		foreach ( $sales_invoice->details as $detail ) {
@@ -362,7 +364,7 @@ add_action(
 			foreach ( $project_ids as $project_id ) {
 				$ids[] = $project_id;
 
-				$invoice_data = [
+				$line_data = [
 					'host'              => 'moneybird.com',
 					'id'                => $sales_invoice->id,
 					'administration_id' => $sales_invoice->administration_id,
@@ -371,27 +373,31 @@ add_action(
 					'detail_id'         => $detail->id,
 				];
 
-				$wpdb->insert(
-					$wpdb->orbis_projects_invoices,
+				$result = $wpdb->insert(
+					$wpdb->orbis_invoices_lines,
 					[
-						'created_at'     => \gmdate( 'Y-m-d H:i:s' ),
-						'project_id'     => $project_id,
-						'invoice_number' => $sales_invoice->id,
-						'invoice_data'   => \wp_json_encode( $invoice_data ),
-						'start_date'     => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
-						'end_date'       => ( null === $period ) ? null : $period->end_date->format( 'Y-m-d' ),
-						'user_id'        => \get_current_user_id(),
+						'invoice_id'      => $orbis_invoice_id,
+						'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
+						'line_number'     => $detail->id,
+						'line_data'       => \wp_json_encode( $line_data ),
+						'project_id'      => $project_id,
+						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
+						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
 					],
 					[
-						'%s',
-						'%d',
-						'%s',
-						'%s',
-						'%s',
-						'%s',
-						'%d',
+						'invoice_id'      => '%d',
+						'created_at'      => '%s',
+						'line_number'     => '%s',
+						'line_data'       => '%s',
+						'project_id'      => '%d',
+						'start_date'      => '%s',
+						'end_date'        => '%s',
 					]
 				);
+
+				if ( false === $result ) {
+					throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database: ' . $wpdb->last_error );
+				}
 			}
 		}
 
@@ -446,61 +452,67 @@ add_action(
 	}
 );
 
+function orbis_moneybird_insert_sales_invoice( $sales_invoice ) {
+	global $wpdb;
+
+	$orbis_invoice = $wpdb->get_row(
+		$wpdb->prepare(
+			"
+			SELECT
+				invoice.*
+			FROM
+				$wpdb->orbis_invoices AS invoice
+			WHERE
+				invoice.invoice_number = %s
+			LIMIT
+				1
+			;
+			",
+			$sales_invoice->id
+		)
+	);
+
+	if ( null !== $orbis_invoice ) {
+		return $orbis_invoice->id;
+	}
+
+	$invoice_data = [
+		'host'              => 'moneybird.com',
+		'id'                => $sales_invoice->id,
+		'administration_id' => $sales_invoice->administration_id,
+		'contact_id'        => $sales_invoice->contact_id,
+		'draft_id'          => $sales_invoice->draft_id,
+	];
+
+	$result = $wpdb->insert(
+		$wpdb->orbis_invoices,
+		[
+			'created_at'     => \gmdate( 'Y-m-d H:i:s' ),
+			'invoice_number' => $sales_invoice->id,
+			'invoice_data'   => \wp_json_encode( $invoice_data ),
+			'user_id'        => \get_current_user_id(),
+		],
+		[
+			'%s',
+			'%s',
+			'%s',
+			'%d',
+		]
+	);
+
+	if ( false === $result ) {
+		throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice into the Orbis database: ' . $wpdb->last_error );
+	}
+
+	return $wpdb->insert_id;
+}
+
 add_action(
 	'pronamic_moneybird_sales_invoice_created',
 	function ( $sales_invoice ) {
 		global $wpdb;
 
-		$invoice_data = [
-			'host'              => 'moneybird.com',
-			'id'                => $sales_invoice->id,
-			'administration_id' => $sales_invoice->administration_id,
-			'contact_id'        => $sales_invoice->contact_id,
-			'draft_id'          => $sales_invoice->draft_id,
-		];
-
-		$orbis_invoice = $wpdb->get_row(
-			$wpdb->prepare(
-				"
-				SELECT
-					invoice.*
-				FROM
-					$wpdb->orbis_invoices AS invoice
-				WHERE
-					invoice.invoice_number = %s
-				LIMIT
-					1
-				;
-				",
-				$sales_invoice->id
-			)
-		);
-
-		$orbis_invoice_id = ( null === $orbis_invoice ) ? null : $orbis_invoice->id;
-
-		if ( null === $orbis_invoice ) {
-			$result = $wpdb->insert(
-				$wpdb->orbis_invoices,
-				[
-					'created_at'     => \gmdate( 'Y-m-d H:i:s' ),
-					'invoice_number' => $sales_invoice->id,
-					'invoice_data'   => \wp_json_encode( $invoice_data ),
-					'user_id'        => \get_current_user_id(),
-				],
-				[
-					'%s',
-					'%s',
-					'%s',
-					'%d',
-				]
-			);
-
-			if ( false === $result ) {
-				throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice into the Orbis database: ' . $wpdb->last_error );
-			}
-
-			$orbis_invoice_id = $wpdb->insert_id;
-		}
+		$orbis_invoice_id = orbis_moneybird_insert_sales_invoice( $sales_invoice );
 
 		$ids = [];
 
@@ -522,7 +534,7 @@ add_action(
 			foreach ( $subscription_ids as $subscription_id ) {
 				$ids[] = $subscription_id;
 
-				$invoice_data = [
+				$line_data = [
 					'host'              => 'moneybird.com',
 					'id'                => $sales_invoice->id,
 					'administration_id' => $sales_invoice->administration_id,
@@ -537,7 +549,7 @@ add_action(
 						'invoice_id'      => $orbis_invoice_id,
 						'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
 						'line_number'     => $detail->id,
-						'line_data'       => \wp_json_encode( $invoice_data ),
+						'line_data'       => \wp_json_encode( $line_data ),
 						'subscription_id' => $subscription_id,
 						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
 						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
