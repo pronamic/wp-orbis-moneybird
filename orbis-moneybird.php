@@ -496,7 +496,7 @@ add_action(
 			);
 
 			if ( false === $result ) {
-				throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice into the Orbis database.' );
+				throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice into the Orbis database: ' . $wpdb->last_error );
 			}
 
 			$orbis_invoice_id = $wpdb->insert_id;
@@ -532,7 +532,7 @@ add_action(
 				];
 
 				$result = $wpdb->insert(
-					$wpdb->orbis_subscriptions_invoices,
+					$wpdb->orbis_invoices_lines,
 					[
 						'invoice_id'      => $orbis_invoice_id,
 						'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
@@ -554,7 +554,7 @@ add_action(
 				);
 
 				if ( false === $result ) {
-					throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database.' );
+					throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database: ' . $wpdb->last_error );
 				}
 			}
 		}
@@ -588,7 +588,6 @@ add_action(
 										MAX( invoice.created_at ) AS created_at
 									FROM
 										$wpdb->orbis_invoices_lines AS invoice_line
-												ON invoice_line.subscription_id = subscription.id
 											INNER JOIN
 										$wpdb->orbis_invoices AS invoice
 												ON invoice.id = invoice_line.invoice_id
