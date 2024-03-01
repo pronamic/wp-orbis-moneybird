@@ -148,14 +148,17 @@ add_action(
 					LEFT JOIN
 				(
 					SELECT
-						project_invoice.project_id,
-						SUM( project_invoice.seconds ) AS project_billed_time,
-						SUM( project_invoice.amount ) AS project_billed_amount,
-						GROUP_CONCAT( DISTINCT project_invoice.invoice_number ) AS project_invoice_numbers
+						invoice_line.project_id,
+						SUM( invoice_line.seconds ) AS project_billed_time,
+						SUM( invoice_line.amount ) AS project_billed_amount,
+						GROUP_CONCAT( DISTINCT invoice.invoice_number ) AS project_invoice_numbers
 					FROM
-						$wpdb->orbis_projects_invoices AS project_invoice
+						$wpdb->orbis_invoices_lines AS invoice_line
+							INNER JOIN
+						$wpdb->orbis_invoices AS invoice
+								ON invoice_line.invoice_id = invoice.id
 					GROUP BY
-						project_invoice.project_id
+						invoice_line.project_id
 				) AS project_invoice_totals ON project_invoice_totals.project_id = project.id
 					LEFT JOIN
 				(
@@ -381,6 +384,8 @@ add_action(
 						'line_number'     => $detail->id,
 						'line_data'       => \wp_json_encode( $line_data ),
 						'project_id'      => $project_id,
+						'amount'          => $detail->price,
+						'seconds'         => $detail->amount_decimal * HOUR_IN_SECONDS,
 						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
 						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
 					],
@@ -390,6 +395,8 @@ add_action(
 						'line_number'     => '%s',
 						'line_data'       => '%s',
 						'project_id'      => '%d',
+						'amount'          => '%f',
+						'seconds'         => '%d',
 						'start_date'      => '%s',
 						'end_date'        => '%s',
 					]
