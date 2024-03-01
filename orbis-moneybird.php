@@ -564,6 +564,7 @@ add_action(
 						'line_number'     => $detail->id,
 						'line_data'       => \wp_json_encode( $line_data ),
 						'subscription_id' => $subscription_id,
+						'amount'          => $detail->total_price_excl_tax_with_discount_base,
 						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
 						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
 					],
@@ -573,6 +574,7 @@ add_action(
 						'line_number'     => '%s',
 						'line_data'       => '%s',
 						'subscription_id' => '%d',
+						'amount'          => '%f',
 						'start_date'      => '%s',
 						'end_date'        => '%s',
 					]
