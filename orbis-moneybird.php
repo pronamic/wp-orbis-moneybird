@@ -411,29 +411,35 @@ add_action(
 						(
 							SELECT
 								project.id AS project_id,
-								project_invoice.id AS invoice_id,
-								project_invoice.created_at AS invoice_created_at,
-								project_invoice.start_date,
-								project_invoice.end_date
+								invoice.id AS invoice_id,
+								invoice.created_at AS invoice_created_at,
+								invoice_line.start_date,
+								invoice_line.end_date
 							FROM
 								$wpdb->orbis_projects AS project
 									INNER JOIN
-								$wpdb->orbis_projects_invoices AS project_invoice
-										ON project_invoice.project_id = project.id
+								$wpdb->orbis_invoices_lines AS invoice_line
+										ON invoice_line.project_id = project.id
+									INNER JOIN
+								$wpdb->orbis_invoices AS invoice
+										ON invoice.id = invoice_line.invoice_id
 									INNER JOIN
 								(
 									SELECT
-										project_invoice.project_id,
-										MAX( project_invoice.created_at ) AS created_at
+										invoice_line.project_id,
+										MAX( invoice.created_at ) AS created_at
 									FROM
-										$wpdb->orbis_projects_invoices AS project_invoice
+										$wpdb->orbis_invoices_lines AS invoice_line
+											INNER JOIN
+										$wpdb->orbis_invoices AS invoice
+												ON invoice.id = invoice_line.invoice_id
 									GROUP BY
-										project_invoice.project_id
+										invoice_line.project_id
 								) AS last_invoice
 										ON (
-											last_invoice.project_id = project_invoice.project_id
+											last_invoice.project_id = invoice_line.project_id
 												AND
-											last_invoice.created_at = project_invoice.created_at
+											last_invoice.created_at = invoice.created_at
 										)
 
 						) AS project_invoice_data
