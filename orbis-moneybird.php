@@ -218,16 +218,14 @@ add_action(
 		];
 
 		$detail->description = \implode( ' · ', \array_unique( \array_filter( $description_parts ) ) );
-		$detail->amount      = \orbis_time( $item->project_billable_time );
-		$detail->price       = $item->project_billable_amount;
+		$detail->amount     = \orbis_time( $item->project_billable_time );
+		$detail->price      = $hourly_rate;
 
 		if ( false !== $date_start && false !== $date_end ) {
 			$detail->period = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
 		}
 
 		if ( false !== \strpos( $item->project_name, 'Online marketing' ) ) {
-			$detail->amount     = \orbis_time( $item->project_billable_time );
-			$detail->price      = $hourly_rate;
 			$detail->product_id = '411373237913519355';
 		}
 
