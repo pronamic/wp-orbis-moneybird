@@ -387,7 +387,7 @@ add_action(
 						'amount'          => $detail->total_price_excl_tax_with_discount_base,
 						'seconds'         => $detail->amount_decimal * HOUR_IN_SECONDS,
 						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
-						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
+						'end_date'        => ( null === $period ) ? null : $period->end_date->format( 'Y-m-d' ),
 					],
 					[
 						'invoice_id'      => '%d',
