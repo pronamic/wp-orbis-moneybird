@@ -279,10 +279,14 @@ add_action(
 			)
 		);
 
+		$references = [];
+
 		$subscription_references = [];
 
 		foreach ( $subscriptions as $subscription ) {
 			$subscription_references[] = $subscription_reference = '#subscription_' . $subscription->id;
+
+			$references[] = \get_post_meta( $subscription->post_id, '_orbis_invoice_reference', true );
 
 			$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
 
@@ -325,18 +329,15 @@ add_action(
 			$sales_invoice->details_attributes[] = $detail;
 		}
 
-		$references = [];
-
-		$references[] = \implode( ', ', $subscription_references );
+		\array_unshift( $references, \implode( ', ', $subscription_references ) );
 
 		if ( null !== $sales_invoice->reference && '' !== $sales_invoice->reference ) {
 			$references[] = $sales_invoice->reference;
 		}
 
-		$sales_invoice->reference = implode( ' · ', \array_filter( $references ) );
+		$sales_invoice->reference = implode( ' · ', \array_unique( \array_filter( $references ) ) );
 	}
 );
-
 
 add_action(
 	'pronamic_moneybird_sales_invoice_created',
