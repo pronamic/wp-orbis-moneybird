@@ -48,13 +48,13 @@ add_action(
 		}
 
 		/**
-		 * Orbis Subscriptions.
+		 * Orbis Products.
 		 * 
 		 * @link https://github.com/pronamic/wp-orbis-subscriptions/commit/5f0606c6f4ac01dea3bbdd0e25f058eaaec9a82d
 		 * @link https://github.com/pronamic/wp-pronamic-moneybird
 		 */
-		if ( post_type_exists( 'orbis_subs_product' ) ) {
-			add_post_type_support( 'orbis_subs_product', 'pronamic_moneybird_product' );
+		if ( post_type_exists( 'orbis_product' ) ) {
+			add_post_type_support( 'orbis_product', 'pronamic_moneybird_product' );
 		}
 	},
 	200
@@ -268,8 +268,8 @@ add_action(
 					FROM
 						$wpdb->orbis_subscriptions AS subscription
 							INNER JOIN
-						$wpdb->orbis_subscription_products AS product
-								ON subscription.type_id = product.id
+						$wpdb->orbis_products AS product
+								ON subscription.product_id = product.id
 					WHERE
 						subscription.id IN ( %s )
 					",
