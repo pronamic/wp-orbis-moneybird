@@ -3,9 +3,10 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Orbis Moneybird 1.0.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/orbis-moneybird\n"
-"POT-Creation-Date: 2024-02-15T09:27:06+00:00\n"
-"PO-Revision-Date: 2024-02-15 10:28+0100\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/orbis-"
+"moneybird\n"
+"POT-Creation-Date: 2024-03-25T11:30:43+00:00\n"
+"PO-Revision-Date: 2024-03-25 12:31+0100\n"
 "Last-Translator: Remco Tolsma <info@remcotolsma.nl>\n"
 "Language-Team: \n"
 "Language: nl_NL\n"
@@ -24,8 +25,12 @@ msgid "https://wp.pronamic.directory/plugins/orbis-moneybird/"
 msgstr "https://wp.pronamic.directory/plugins/orbis-moneybird/"
 
 #. Description of the plugin
-msgid "This WordPress plugin provides the link between Orbis and your Moneybird administration."
-msgstr "Deze WordPress plugin zorgt voor de koppeling tussen Orbis en je Moneybird-administratie."
+msgid ""
+"This WordPress plugin provides the link between Orbis and your Moneybird "
+"administration."
+msgstr ""
+"Deze WordPress plugin zorgt voor de koppeling tussen Orbis en je Moneybird-"
+"administratie."
 
 #. Author of the plugin
 msgid "Pronamic"
@@ -35,7 +40,7 @@ msgstr "Pronamic"
 msgid "https://www.pronamic.eu/"
 msgstr "https://www.pronamic.nl/"
 
-#: templates/contact-card.php:27
+#: templates/contact-card.php:27 templates/product-card.php:27
 msgid "Moneybird"
 msgstr "Moneybird"
 
@@ -46,3 +51,11 @@ msgstr "Contact-ID"
 #: templates/contact-card.php:38
 msgid "No Moneybird contact ID set."
 msgstr "Er is geen Moneybird-contact-ID ingesteld."
+
+#: templates/product-card.php:31
+msgid "Product ID"
+msgstr "Product-ID"
+
+#: templates/product-card.php:38
+msgid "No Moneybird product ID set."
+msgstr "Er is geen Moneybird-product-ID ingesteld."
