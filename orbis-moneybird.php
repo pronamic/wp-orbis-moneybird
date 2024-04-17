@@ -76,6 +76,21 @@ add_action(
 	}
 );
 
+add_action(
+	'orbis_after_side_content',
+	function () {
+		if ( ! is_singular() ) {
+			return;
+		}
+
+		if ( ! post_type_supports( get_post_field( 'post_type' ), 'pronamic_moneybird_product' ) ) {
+			return;
+		}
+
+		include __DIR__ . '/templates/product-card.php';
+	}
+);
+
 \add_action(
 	'pronamic_moneybird_new_sales_invoice',
 	function ( $sales_invoice ) {
