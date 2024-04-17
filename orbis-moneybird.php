@@ -55,6 +55,7 @@ add_action(
 		 */
 		if ( post_type_exists( 'orbis_product' ) ) {
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_product' );
+			add_post_type_support( 'orbis_product', 'pronamic_moneybird_project' );
 		}
 	},
 	200
