@@ -341,6 +341,7 @@ add_action(
 			$detail->amount      = '1';
 			$detail->price       = $subscription->price;
 			$detail->product_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_product_id', true );
+			$detail->project_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_project_id', true );
 			$detail->period      = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
 
 			$sales_invoice->details_attributes[] = $detail;
