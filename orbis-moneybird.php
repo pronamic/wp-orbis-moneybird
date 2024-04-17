@@ -54,6 +54,7 @@ add_action(
 		 * @link https://github.com/pronamic/wp-pronamic-moneybird
 		 */
 		if ( post_type_exists( 'orbis_product' ) ) {
+			add_post_type_support( 'orbis_product', 'pronamic_moneybird_ledger_account' );
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_product' );
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_project' );
 		}
