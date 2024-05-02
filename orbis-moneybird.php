@@ -207,9 +207,18 @@ add_action(
 
 		$project_references[] = $project_reference = '#project_' . $item->project_id;
 
+		$project_billable_time = $item->project_billable_time;
+		$project_billed_time   = $item->project_billed_time;
+		$project_invoice_time  = $project_billable_time - $project_billed_time;
+
 		$references = [];
 
 		$references[] = \implode( ', ', $project_references );
+
+		if ( $project_invoice_time < $project_billable_time ) {
+			$references[] = 'Deelfactuur';
+		}
+
 		$references[] = $item->project_name;
 		$references[] = \get_post_meta( $item->project_post_id, '_orbis_invoice_reference', true );
 
@@ -235,7 +244,7 @@ add_action(
 		];
 
 		$detail->description = \implode( ' · ', \array_unique( \array_filter( $description_parts ) ) );
-		$detail->amount     = \orbis_time( $item->project_billable_time );
+		$detail->amount     = \orbis_time( $project_invoice_time );
 		$detail->price      = $hourly_rate;
 
 		if ( false !== $date_start && false !== $date_end ) {
