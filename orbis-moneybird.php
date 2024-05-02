@@ -203,13 +203,36 @@ add_action(
 			return;
 		}
 
+		/**
+		 * Invoicing moment.
+		 * 
+		 * @link https://www.credit-care.com/blogs/wanneer-factureren/
+		 */
+		$billing_strategy = 'progress';
+
+		if ( str_contains( $item->project_name, 'Online marketing' ) ) {
+			$billing_strategy = 'afterwards';
+		}
+
+		if ( str_contains( $item->project_name, 'Scrum' ) ) {
+			$billing_strategy = 'afterwards';
+		}
+
+		if ( str_contains( $item->project_name, 'Strippenkaart' ) ) {
+			$billing_strategy = 'in_advance';
+		}
+
 		$project_references = [];
 
 		$project_references[] = $project_reference = '#project_' . $item->project_id;
 
 		$project_billable_time = $item->project_billable_time;
 		$project_billed_time   = $item->project_billed_time;
-		$project_invoice_time  = $project_billable_time - $project_billed_time;
+		$project_invoice_time  = $project_billable_time;
+
+		if ( 'progress' === $billing_strategy ) {
+			$project_invoice_time = min( $item->project_timesheet_time, $item->project_billable_time ) - $project_billed_time;
+		}
 
 		$references = [];
 
@@ -220,6 +243,15 @@ add_action(
 		}
 
 		$references[] = $item->project_name;
+
+		if ( $project_invoice_time < $project_billable_time ) {
+			$references[] = \sprintf(
+				'%s / %s uren',
+				orbis_time( min( $item->project_timesheet_time, $item->project_billable_time ) ),
+				orbis_time( $item->project_billable_time )
+			);
+		}
+
 		$references[] = \get_post_meta( $item->project_post_id, '_orbis_invoice_reference', true );
 
 		if ( null !== $sales_invoice->reference && '' !== $sales_invoice->reference ) {
