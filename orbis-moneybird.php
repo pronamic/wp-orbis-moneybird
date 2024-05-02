@@ -256,6 +256,60 @@ add_action(
 		}
 
 		$sales_invoice->details_attributes[] = $detail;
+
+		/**
+		 * Previous project invoices.
+		 * 
+		 * @link https://github.com/pronamic/orbis.pronamic.nl/issues/38
+		 */
+		$previous_project_invoices = $wpdb->get_results(
+			$wpdb->prepare(
+				"
+				SELECT
+					invoice.id,
+					invoice.created_at,
+					invoice.invoice_number,
+					SUM( invoice_line.amount ) AS amount,
+					SUM( invoice_line.seconds ) AS seconds
+				FROM
+					$wpdb->orbis_invoices AS invoice
+						LEFT JOIN
+					$wpdb->orbis_invoices_lines AS invoice_line
+							ON invoice_line.invoice_id = invoice.id
+				WHERE
+					invoice_line.project_id = %d
+				GROUP BY
+					invoice.id
+				;
+				",
+				$project_id
+			)
+		);
+
+		if ( count( $previous_project_invoices ) > 0 ) {
+			$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
+
+			$detail_lines = [];
+
+			$detail_lines[] = '*' . 'Eerdere projectfacturen:' . '*';
+
+			foreach ( $previous_project_invoices as $previous_project_invoice ) {
+				$date = new DateTimeImmutable( $previous_project_invoice->created_at );
+
+				$parts = [
+					$date->format( 'd-m-Y' ),
+					'Factuur ' . $previous_project_invoice->invoice_number,
+					orbis_time( $previous_project_invoice->seconds ),
+					'€ ' . number_format_i18n( $previous_project_invoice->amount, 2 ),
+				];
+
+				$detail_lines[] = '• ' . \implode( ' · ', $parts );
+			}
+
+			$detail->description = \implode( "\r\n", $detail_lines );
+
+			$sales_invoice->details_attributes[] = $detail;
+		}
 	}
 );
 
