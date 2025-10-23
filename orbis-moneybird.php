@@ -393,10 +393,8 @@ add_action(
 
 		$references = [];
 
-		$subscription_references = [];
-
 		foreach ( $subscriptions as $subscription ) {
-			$subscription_references[] = $subscription_reference = '#subscription_' . $subscription->id;
+			$subscription_reference = '#subscription_' . $subscription->id;
 
 			$references[] = \get_post_meta( $subscription->post_id, '_orbis_invoice_reference', true );
 
@@ -441,8 +439,6 @@ add_action(
 
 			$sales_invoice->details_attributes[] = $detail;
 		}
-
-		\array_unshift( $references, \implode( ', ', $subscription_references ) );
 
 		if ( null !== $sales_invoice->reference && '' !== $sales_invoice->reference ) {
 			$references[] = $sales_invoice->reference;
