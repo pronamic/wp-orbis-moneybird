@@ -57,6 +57,7 @@ add_action(
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_ledger_account' );
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_product' );
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_project' );
+			add_post_type_support( 'orbis_product', 'pronamic_moneybird_sales_invoice' );
 		}
 	},
 	200
