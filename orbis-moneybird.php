@@ -57,6 +57,7 @@ add_action(
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_ledger_account' );
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_product' );
 			add_post_type_support( 'orbis_product', 'pronamic_moneybird_project' );
+			add_post_type_support( 'orbis_product', 'pronamic_moneybird_sales_invoice' );
 		}
 	},
 	200
@@ -394,50 +395,13 @@ add_action(
 		$references = [];
 
 		foreach ( $subscriptions as $subscription ) {
-			$subscription_reference = '#subscription_' . $subscription->id;
-
 			$references[] = \get_post_meta( $subscription->post_id, '_orbis_invoice_reference', true );
 
-			$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
+			$details = orbis_moneybird_subscription_get_sales_invoice_details( $subscription );
 
-			$date_start = DateTimeImmutable::createFromFormat( 'Y-m-d', $subscription->start_date )->setTime( 0, 0 );
-
-			switch ( $subscription->product_interval ) {
-				case 'M':
-					$date_end = $date_start->modify( '+1 month' );
-					break;
-				case 'Y':
-					$date_end = $date_start->modify( '+1 year' );
-					break;
-				default:
-					throw new Exception( 'Unsupported product interval: ' . $subscription->product_interval );
+			foreach ( $details as $detail ) {
+				$sales_invoice->details_attributes[] = $detail;
 			}
-
-			/**
-			 * In Orbis a subscription annual period is from, for example, 2005-01-01 to 2006-01-01 (exclusive).
-			 * In Moneybrid and accounting this actually runs from 2005-01-01 to 2005-12-31 (inclusive).
-			 * That's why we're moving the end date back one day.
-			 * 
-			 * @link https://taaladvies.net/tot-of-tot-en-met/
-			 */
-			$date_end = $date_end->modify( '-1 day' );
-
-			$description_line = get_post_meta( $subscription->post_id, '_orbis_invoice_line_description', true );
-
-			$description_parts = [
-				$subscription->product_name,
-				( '' === $description_line ) ? $subscription->name : $description_line,
-				$subscription_reference
-			];
-
-			$detail->description = \implode( ' · ', $description_parts );
-			$detail->amount      = '1';
-			$detail->price       = $subscription->price;
-			$detail->product_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_product_id', true );
-			$detail->project_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_project_id', true );
-			$detail->period      = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
-
-			$sales_invoice->details_attributes[] = $detail;
 		}
 
 		if ( null !== $sales_invoice->reference && '' !== $sales_invoice->reference ) {
@@ -447,6 +411,119 @@ add_action(
 		$sales_invoice->reference = implode( ' · ', \array_unique( \array_filter( $references ) ) );
 	}
 );
+
+function orbis_moneybird_subscription_get_sales_invoice_details( $subscription ) {
+	$subscription_reference = '#subscription_' . $subscription->id;
+
+	$date_start = DateTimeImmutable::createFromFormat( 'Y-m-d', $subscription->start_date )->setTime( 0, 0 );
+
+	switch ( $subscription->product_interval ) {
+		case 'M':
+			$date_end = $date_start->modify( '+1 month' );
+			break;
+		case 'Y':
+			$date_end = $date_start->modify( '+1 year' );
+			break;
+		default:
+			throw new Exception( 'Unsupported product interval: ' . $subscription->product_interval );
+	}
+
+	/**
+	 * In Orbis a subscription annual period is from, for example, 2005-01-01 to 2006-01-01 (exclusive).
+	 * In Moneybrid and accounting this actually runs from 2005-01-01 to 2005-12-31 (inclusive).
+	 * That's why we're moving the end date back one day.
+	 * 
+	 * @link https://taaladvies.net/tot-of-tot-en-met/
+	 */
+	$date_end = $date_end->modify( '-1 day' );
+
+	/**
+	 * Description.
+	 */
+	$description_line = get_post_meta( $subscription->post_id, '_orbis_invoice_line_description', true );
+
+	$subscription_name = ( '' === $description_line ) ? $subscription->name : $description_line;
+
+	/**
+	 * Product sales invoice template.
+	 */
+	$json = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_sales_invoice', true );
+
+	$data = \json_decode( $json );
+
+	if ( \is_object( $data ) && \property_exists( $data, 'details_attributes' ) && \is_array( $data->details_attributes ) ) {
+		$detail_properties = [
+			'amount',
+			'description',
+			'price',
+			'product_id',
+			'project_id',
+		];
+
+		$details = [];
+
+		foreach ( $data->details_attributes as $detail_data ) {
+			$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
+
+			foreach ( $detail_properties as $property ) {
+				if ( \property_exists( $detail_data, $property ) ) {
+					$detail->$property = $detail_data->$property;
+				}
+			}
+
+			$detail->period = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
+
+			$description = $detail->description;
+
+			if ( '' === $description ) {
+				$description = \sprintf(
+					'%s · %s',
+					$subscription->product_name,
+					$subscription_name
+				);
+			}
+
+			$description_parts = [
+				\strtr(
+					$description,
+					[
+						'{subscription_name}' => $subscription_name,
+					]
+				),
+				$subscription_reference
+			];
+
+			$detail->description = \implode( ' · ', $description_parts );
+
+			$details[] = $detail;
+		}
+
+		return $details;
+	}
+
+	$detail = new \Pronamic\Moneybird\SalesInvoiceDetail();
+
+	$description_line = get_post_meta( $subscription->post_id, '_orbis_invoice_line_description', true );
+
+	$description_parts = [
+		$subscription->product_name,
+		( '' === $description_line ) ? $subscription->name : $description_line,
+		$subscription_reference
+	];
+
+	$description = \implode( ' · ', $description_parts );
+
+	$detail->description = $description;
+	$detail->amount      = '1';
+	$detail->price       = $subscription->price;
+	$detail->product_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_product_id', true );
+	$detail->project_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_project_id', true );
+	$detail->period      = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
+
+	return [
+		$detail,
+	];
+}
 
 add_action(
 	'pronamic_moneybird_sales_invoice_created',
