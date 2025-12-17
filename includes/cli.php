@@ -47,10 +47,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 					$url = \add_query_arg(
 						[
 							'page'   => $page,
-							'period' => $period,
+							'filter' => 'period:' . $period,
 						],
 						'https://moneybird.com/api/v2/' . $administration_id . '/sales_invoices.json'
 					);
+
+					WP_CLI::log( 'Moneybird API URL: ' . $url );
 
 					$response = \wp_remote_get(
 						$url,
