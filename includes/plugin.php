@@ -17,7 +17,7 @@ add_action(
 	function () {
 		/**
 		 * Orbis Companies.
-		 * 
+		 *
 		 * @link https://github.com/pronamic/wp-orbis-companies/commit/7da50a62313b77de7dc831f854b0fd08b6063d7f
 		 * @link https://github.com/pronamic/wp-pronamic-moneybird
 		 */
@@ -27,7 +27,7 @@ add_action(
 
 		/**
 		 * Orbis Products.
-		 * 
+		 *
 		 * @link https://github.com/pronamic/wp-orbis-subscriptions/commit/5f0606c6f4ac01dea3bbdd0e25f058eaaec9a82d
 		 * @link https://github.com/pronamic/wp-pronamic-moneybird
 		 */
@@ -52,7 +52,7 @@ add_action(
 			return;
 		}
 
-		include __DIR__ . '/templates/contact-card.php';
+		include __DIR__ . '/../templates/contact-card.php';
 	}
 );
 
@@ -67,7 +67,7 @@ add_action(
 			return;
 		}
 
-		include __DIR__ . '/templates/product-card.php';
+		include __DIR__ . '/../templates/product-card.php';
 	}
 );
 
@@ -184,7 +184,7 @@ add_action(
 
 		/**
 		 * Invoicing moment.
-		 * 
+		 *
 		 * @link https://www.credit-care.com/blogs/wanneer-factureren/
 		 */
 		$billing_strategy = 'progress';
@@ -270,7 +270,7 @@ add_action(
 
 		/**
 		 * Previous project invoices.
-		 * 
+		 *
 		 * @link https://github.com/pronamic/orbis.pronamic.nl/issues/38
 		 */
 		$previous_project_invoices = $wpdb->get_results(
@@ -410,7 +410,7 @@ function orbis_moneybird_subscription_get_sales_invoice_details( $subscription )
 	 * In Orbis a subscription annual period is from, for example, 2005-01-01 to 2006-01-01 (exclusive).
 	 * In Moneybrid and accounting this actually runs from 2005-01-01 to 2005-12-31 (inclusive).
 	 * That's why we're moving the end date back one day.
-	 * 
+	 *
 	 * @link https://taaladvies.net/tot-of-tot-en-met/
 	 */
 	$date_end = $date_end->modify( '-1 day' );
