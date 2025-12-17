@@ -21,7 +21,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	function () {
 		WP_CLI::add_command(
 			'orbis-moneybird import-sales-invoices',
-			function () {
+			function ( $args,  $assoc_args ) {
+				$assoc_args = wp_parse_args(
+					$assoc_args,
+					[
+						'page'   => 1,
+						'period' => 'this_year',
+					]
+				);
+
 				/**
 				 * Moneybird client.
 				 */
@@ -30,12 +38,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 				$api_token = \get_post_meta( $authorization_id, '_pronamic_moneybird_api_token', true );
 
-				$page = 1;
+				$page   = $assoc_args['page'];
+				$period = $assoc_args['period'];
 
 				while ( true ) {
-										WP_CLI::log( 'Page: ' . $page );
+					WP_CLI::log( 'Page: ' . $page );
 
-					$url = 'https://moneybird.com/api/v2/' . $administration_id . '/sales_invoices.json?page=' . $page;
+					$url = \add_query_arg(
+						[
+							'page'   => $page,
+							'period' => $period,
+						],
+						'https://moneybird.com/api/v2/' . $administration_id . '/sales_invoices.json'
+					);
 
 					$response = \wp_remote_get(
 						$url,
