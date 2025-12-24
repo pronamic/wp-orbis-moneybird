@@ -667,12 +667,16 @@ function orbis_moneybird_insert_sales_invoice( $sales_invoice ) {
 			'invoice_number' => $sales_invoice->id,
 			'invoice_data'   => \wp_json_encode( $invoice_data ),
 			'user_id'        => \get_current_user_id(),
+			'external_source' => 'moneybird',
+			'external_id'     => $sales_invoice->id,
 		],
 		[
 			'%s',
 			'%s',
 			'%s',
 			'%d',
+			'%s',
+			'%s',
 		]
 	);
 
