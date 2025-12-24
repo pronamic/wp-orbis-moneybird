@@ -415,6 +415,25 @@ function orbis_moneybird_subscription_get_sales_invoice_details( $subscription )
 	 */
 	$date_end = $date_end->modify( '-1 day' );
 
+	$factor = 1;
+
+	if ( array_key_exists( 'billing_until', $_GET ) ) {
+		$billing_until_string = \sanitize_text_field( \wp_unslash( $_GET['billing_until'] ) );
+
+		$billing_until_date = DateTimeImmutable::createFromFormat( 'Y-m-d', $billing_until_string );
+
+		if ( $billing_until_date instanceof DateTimeImmutable ) {
+			$effective_end = \min( $date_end, $billing_until_date );
+
+			$total_days    = (int) $date_start->diff( $date_end )->days;
+			$billable_days = (int) $date_start->diff( $effective_end )->days;
+
+			$factor = $billable_days / $total_days;
+
+			$date_end = $effective_end;
+		}
+	}
+
 	/**
 	 * Description.
 	 */
@@ -450,6 +469,7 @@ function orbis_moneybird_subscription_get_sales_invoice_details( $subscription )
 			}
 
 			$detail->period = $date_start->format( 'Ymd' ) . '..' . $date_end->format( 'Ymd' );
+			$detail->amount = \round( $detail->amount * $factor, 2 );
 
 			$description = $detail->description;
 
@@ -492,7 +512,7 @@ function orbis_moneybird_subscription_get_sales_invoice_details( $subscription )
 	$description = \implode( ' · ', $description_parts );
 
 	$detail->description = $description;
-	$detail->amount      = '1';
+	$detail->amount      = \round( '1' * $factor, 2 );
 	$detail->price       = $subscription->price;
 	$detail->product_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_product_id', true );
 	$detail->project_id  = \get_post_meta( $subscription->product_post_id, '_pronamic_moneybird_project_id', true );
