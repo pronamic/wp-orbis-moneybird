@@ -402,6 +402,9 @@ function orbis_moneybird_subscription_get_sales_invoice_details( $subscription )
 		case 'Y':
 			$date_end = $date_start->modify( '+1 year' );
 			break;
+		case '2Y':
+			$date_end = $date_start->modify( '+2 years' );
+			break;
 		default:
 			throw new Exception( 'Unsupported product interval: ' . $subscription->product_interval );
 	}
