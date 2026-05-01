@@ -154,5 +154,118 @@ if ( ! defined( 'ABSPATH' ) ) {
 				}
 			}
 		);
+
+		WP_CLI::add_command(
+			'orbis-moneybird process-sales-invoice',
+			function ( $args, $assoc_args ) {
+				if ( ! \function_exists( '\\orbis_moneybird_process_sales_invoice_projects' ) ) {
+					WP_CLI::error( 'Function orbis_moneybird_process_sales_invoice_projects does not exist.' );
+				}
+
+				if ( ! \function_exists( '\\orbis_moneybird_process_sales_invoice_subscriptions' ) ) {
+					WP_CLI::error( 'Function orbis_moneybird_process_sales_invoice_subscriptions does not exist.' );
+				}
+
+				$authorization_id = \array_key_exists( 'authorization_id', $assoc_args )
+					? (int) $assoc_args['authorization_id']
+					: (int) \get_option( 'pronamic_moneybird_authorization_post_id' );
+
+				if ( 0 === $authorization_id ) {
+					WP_CLI::error( 'Could not determine authorization post ID, provide --authorization_id or configure pronamic_moneybird_authorization_post_id.' );
+				}
+
+				$api_token         = \get_post_meta( $authorization_id, '_pronamic_moneybird_api_token', true );
+				$administration_id = \get_post_meta( $authorization_id, '_pronamic_moneybird_administration_id', true );
+
+				if ( '' === $api_token ) {
+					WP_CLI::error( 'Could not retrieve API token for authorization post ID: ' . $authorization_id );
+				}
+
+				if ( '' === $administration_id ) {
+					WP_CLI::error( 'Could not retrieve administration ID for authorization post ID: ' . $authorization_id );
+				}
+
+				$has_id        = \array_key_exists( 'id', $assoc_args );
+				$has_reference = \array_key_exists( 'reference', $assoc_args );
+
+				if ( $has_id && $has_reference ) {
+					WP_CLI::error( 'Please provide either --id or --reference, not both.' );
+				}
+
+				if ( ! $has_id && ! $has_reference ) {
+					WP_CLI::error( 'Please provide either --id or --reference.' );
+				}
+
+				if ( $has_id ) {
+					$url = \sprintf(
+						'https://moneybird.com/api/v2/%s/sales_invoices/%s.json',
+						$administration_id,
+						$assoc_args['id']
+					);
+				} else {
+					$url = \sprintf(
+						'https://moneybird.com/api/v2/%s/sales_invoices/find_by_reference/%s.json',
+						$administration_id,
+						\rawurlencode( $assoc_args['reference'] )
+					);
+				}
+
+				WP_CLI::log( 'Moneybird API URL: ' . $url );
+
+				$response = \wp_remote_get(
+					$url,
+					[
+						'headers' => [
+							'Authorization' => 'Bearer ' . $api_token,
+						],
+					]
+				);
+
+				$response_code = \wp_remote_retrieve_response_code( $response );
+
+				if ( 200 !== $response_code ) {
+					WP_CLI::error( 'Could not retrieve sales invoice from Moneybird. Response code: ' . $response_code );
+				}
+
+				$body = \wp_remote_retrieve_body( $response );
+
+				$sales_invoice = \json_decode( $body );
+
+				if ( ! \is_object( $sales_invoice ) ) {
+					WP_CLI::error( 'Invalid JSON response from Moneybird.' );
+				}
+
+				WP_CLI::log( 'Sales invoice ID: ' . $sales_invoice->id );
+				WP_CLI::log( 'Invoice ID: ' . ( $sales_invoice->invoice_id ?? '(draft)' ) );
+				WP_CLI::log( 'Reference: ' . ( $sales_invoice->reference ?? '' ) );
+
+				\orbis_moneybird_process_sales_invoice_projects( $sales_invoice );
+				\orbis_moneybird_process_sales_invoice_subscriptions( $sales_invoice );
+
+				WP_CLI::success( 'Processed sales invoice: ' . $sales_invoice->id );
+			},
+			[
+				'synopsis' => [
+					[
+						'type'        => 'assoc',
+						'name'        => 'authorization_id',
+						'description' => 'The authorization post ID for retrieving the Moneybird API token.',
+						'optional'    => true,
+					],
+					[
+						'type'        => 'assoc',
+						'name'        => 'id',
+						'description' => 'The Moneybird sales invoice ID.',
+						'optional'    => true,
+					],
+					[
+						'type'        => 'assoc',
+						'name'        => 'reference',
+						'description' => 'The sales invoice reference.',
+						'optional'    => true,
+					],
+				],
+			]
+		);
 	}
 );

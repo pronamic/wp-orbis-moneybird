@@ -526,130 +526,148 @@ function orbis_moneybird_subscription_get_sales_invoice_details( $subscription )
 	];
 }
 
-add_action(
-	'pronamic_moneybird_sales_invoice_created',
-	function ( $sales_invoice ) {
-		global $wpdb;
+function orbis_moneybird_process_sales_invoice_projects( $sales_invoice ) {
+	global $wpdb;
 
-		$orbis_invoice_id = orbis_moneybird_insert_sales_invoice( $sales_invoice );
+	$orbis_invoice_id = orbis_moneybird_insert_sales_invoice( $sales_invoice );
 
-		$ids = [];
+	$ids = [];
 
-		foreach ( $sales_invoice->details as $detail ) {
-			$result = \preg_match_all(
-				'/#project_(?P<project_id>[0-9]+)/',
-				$detail->description,
-				$matches
+	foreach ( $sales_invoice->details as $detail ) {
+		$result = \preg_match_all(
+			'/#project_(?P<project_id>[0-9]+)/',
+			$detail->description,
+			$matches
+		);
+
+		if ( false === $result ) {
+			continue;
+		}
+
+		$project_ids = \array_key_exists( 'project_id', $matches ) ? $matches['project_id'] : [];
+
+		$period = ( null === $detail->period ) ? null : \Pronamic\Moneybird\Period::from_string( $detail->period );
+
+		foreach ( $project_ids as $project_id ) {
+			$ids[] = $project_id;
+
+			$line_data = [
+				'host'              => 'moneybird.com',
+				'id'                => $sales_invoice->id,
+				'administration_id' => $sales_invoice->administration_id,
+				'contact_id'        => $sales_invoice->contact_id,
+				'draft_id'          => $sales_invoice->draft_id,
+				'detail_id'         => $detail->id,
+			];
+
+			$exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM $wpdb->orbis_invoices_lines WHERE invoice_id = %d AND line_number = %s AND project_id = %d LIMIT 1",
+					$orbis_invoice_id,
+					$detail->id,
+					$project_id
+				)
 			);
 
-			if ( false === $result ) {
+			if ( null !== $exists ) {
 				continue;
 			}
 
-			$project_ids = \array_key_exists( 'project_id', $matches ) ? $matches['project_id'] : [];
+			$result = $wpdb->insert(
+				$wpdb->orbis_invoices_lines,
+				[
+					'invoice_id'      => $orbis_invoice_id,
+					'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
+					'line_number'     => $detail->id,
+					'line_data'       => \wp_json_encode( $line_data ),
+					'project_id'      => $project_id,
+					'amount'          => $detail->total_price_excl_tax_with_discount_base,
+					'seconds'         => $detail->amount_decimal * HOUR_IN_SECONDS,
+					'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
+					'end_date'        => ( null === $period ) ? null : $period->end_date->format( 'Y-m-d' ),
+				],
+				[
+					'invoice_id'      => '%d',
+					'created_at'      => '%s',
+					'line_number'     => '%s',
+					'line_data'       => '%s',
+					'project_id'      => '%d',
+					'amount'          => '%f',
+					'seconds'         => '%d',
+					'start_date'      => '%s',
+					'end_date'        => '%s',
+				]
+			);
 
-			$period = ( null === $detail->period ) ? null : \Pronamic\Moneybird\Period::from_string( $detail->period );
-
-			foreach ( $project_ids as $project_id ) {
-				$ids[] = $project_id;
-
-				$line_data = [
-					'host'              => 'moneybird.com',
-					'id'                => $sales_invoice->id,
-					'administration_id' => $sales_invoice->administration_id,
-					'contact_id'        => $sales_invoice->contact_id,
-					'draft_id'          => $sales_invoice->draft_id,
-					'detail_id'         => $detail->id,
-				];
-
-				$result = $wpdb->insert(
-					$wpdb->orbis_invoices_lines,
-					[
-						'invoice_id'      => $orbis_invoice_id,
-						'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
-						'line_number'     => $detail->id,
-						'line_data'       => \wp_json_encode( $line_data ),
-						'project_id'      => $project_id,
-						'amount'          => $detail->total_price_excl_tax_with_discount_base,
-						'seconds'         => $detail->amount_decimal * HOUR_IN_SECONDS,
-						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
-						'end_date'        => ( null === $period ) ? null : $period->end_date->format( 'Y-m-d' ),
-					],
-					[
-						'invoice_id'      => '%d',
-						'created_at'      => '%s',
-						'line_number'     => '%s',
-						'line_data'       => '%s',
-						'project_id'      => '%d',
-						'amount'          => '%f',
-						'seconds'         => '%d',
-						'start_date'      => '%s',
-						'end_date'        => '%s',
-					]
-				);
-
-				if ( false === $result ) {
-					throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database: ' . $wpdb->last_error );
-				}
+			if ( false === $result ) {
+				throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database: ' . $wpdb->last_error );
 			}
 		}
-
-		$wpdb->query(
-			$wpdb->prepare(
-				sprintf(
-					"
-					UPDATE
-						$wpdb->orbis_projects AS project
-							INNER JOIN
-						(
-							SELECT
-								project.id AS project_id,
-								invoice.id AS invoice_id,
-								invoice.created_at AS invoice_created_at,
-								invoice_line.start_date,
-								invoice_line.end_date
-							FROM
-								$wpdb->orbis_projects AS project
-									INNER JOIN
-								$wpdb->orbis_invoices_lines AS invoice_line
-										ON invoice_line.project_id = project.id
-									INNER JOIN
-								$wpdb->orbis_invoices AS invoice
-										ON invoice.id = invoice_line.invoice_id
-									INNER JOIN
-								(
-									SELECT
-										invoice_line.project_id,
-										MAX( invoice.created_at ) AS created_at
-									FROM
-										$wpdb->orbis_invoices_lines AS invoice_line
-											INNER JOIN
-										$wpdb->orbis_invoices AS invoice
-												ON invoice.id = invoice_line.invoice_id
-									GROUP BY
-										invoice_line.project_id
-								) AS last_invoice
-										ON (
-											last_invoice.project_id = invoice_line.project_id
-												AND
-											last_invoice.created_at = invoice.created_at
-										)
-
-						) AS project_invoice_data
-							ON project.id = project_invoice_data.project_id
-					SET
-						project.billed_to = project_invoice_data.end_date
-					WHERE
-						project.id IN ( %s )
-					;
-					",
-					\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
-				),
-				$ids
-			)
-		);
 	}
-);
+
+	$ids = \array_values( \array_unique( $ids ) );
+
+	if ( 0 === \count( $ids ) ) {
+		return;
+	}
+
+	$wpdb->query(
+		$wpdb->prepare(
+			sprintf(
+				"
+				UPDATE
+					$wpdb->orbis_projects AS project
+						INNER JOIN
+					(
+						SELECT
+							project.id AS project_id,
+							invoice.id AS invoice_id,
+							invoice.created_at AS invoice_created_at,
+							invoice_line.start_date,
+							invoice_line.end_date
+						FROM
+							$wpdb->orbis_projects AS project
+								INNER JOIN
+							$wpdb->orbis_invoices_lines AS invoice_line
+									ON invoice_line.project_id = project.id
+								INNER JOIN
+							$wpdb->orbis_invoices AS invoice
+									ON invoice.id = invoice_line.invoice_id
+								INNER JOIN
+							(
+								SELECT
+									invoice_line.project_id,
+									MAX( invoice.created_at ) AS created_at
+								FROM
+									$wpdb->orbis_invoices_lines AS invoice_line
+										INNER JOIN
+									$wpdb->orbis_invoices AS invoice
+											ON invoice.id = invoice_line.invoice_id
+								GROUP BY
+									invoice_line.project_id
+							) AS last_invoice
+									ON (
+										last_invoice.project_id = invoice_line.project_id
+											AND
+										last_invoice.created_at = invoice.created_at
+									)
+
+					) AS project_invoice_data
+						ON project.id = project_invoice_data.project_id
+				SET
+					project.billed_to = project_invoice_data.end_date
+				WHERE
+					project.id IN ( %s )
+				;
+				",
+				\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
+			),
+			$ids
+		)
+	);
+}
+
+add_action( 'pronamic_moneybird_sales_invoice_created', 'orbis_moneybird_process_sales_invoice_projects' );
 
 function orbis_moneybird_insert_sales_invoice( $sales_invoice ) {
 	global $wpdb;
@@ -710,128 +728,146 @@ function orbis_moneybird_insert_sales_invoice( $sales_invoice ) {
 	return $wpdb->insert_id;
 }
 
-add_action(
-	'pronamic_moneybird_sales_invoice_created',
-	function ( $sales_invoice ) {
-		global $wpdb;
+function orbis_moneybird_process_sales_invoice_subscriptions( $sales_invoice ) {
+	global $wpdb;
 
-		$orbis_invoice_id = orbis_moneybird_insert_sales_invoice( $sales_invoice );
+	$orbis_invoice_id = orbis_moneybird_insert_sales_invoice( $sales_invoice );
 
-		$ids = [];
+	$ids = [];
 
-		foreach ( $sales_invoice->details as $detail ) {
-			$result = \preg_match_all(
-				'/#subscription_(?P<subscription_id>[0-9]+)/',
-				$detail->description,
-				$matches
+	foreach ( $sales_invoice->details as $detail ) {
+		$result = \preg_match_all(
+			'/#subscription_(?P<subscription_id>[0-9]+)/',
+			$detail->description,
+			$matches
+		);
+
+		if ( false === $result ) {
+			continue;
+		}
+
+		$subscription_ids = \array_key_exists( 'subscription_id', $matches ) ? $matches['subscription_id'] : [];
+
+		$period = ( null === $detail->period ) ? null : \Pronamic\Moneybird\Period::from_string( $detail->period );
+
+		foreach ( $subscription_ids as $subscription_id ) {
+			$ids[] = $subscription_id;
+
+			$line_data = [
+				'host'              => 'moneybird.com',
+				'id'                => $sales_invoice->id,
+				'administration_id' => $sales_invoice->administration_id,
+				'contact_id'        => $sales_invoice->contact_id,
+				'draft_id'          => $sales_invoice->draft_id,
+				'detail_id'         => $detail->id,
+			];
+
+			$exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM $wpdb->orbis_invoices_lines WHERE invoice_id = %d AND line_number = %s AND subscription_id = %d LIMIT 1",
+					$orbis_invoice_id,
+					$detail->id,
+					$subscription_id
+				)
 			);
 
-			if ( false === $result ) {
+			if ( null !== $exists ) {
 				continue;
 			}
 
-			$subscription_ids = \array_key_exists( 'subscription_id', $matches ) ? $matches['subscription_id'] : [];
+			$result = $wpdb->insert(
+				$wpdb->orbis_invoices_lines,
+				[
+					'invoice_id'      => $orbis_invoice_id,
+					'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
+					'line_number'     => $detail->id,
+					'line_data'       => \wp_json_encode( $line_data ),
+					'subscription_id' => $subscription_id,
+					'amount'          => $detail->total_price_excl_tax_with_discount_base,
+					'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
+					'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
+				],
+				[
+					'invoice_id'      => '%d',
+					'created_at'      => '%s',
+					'line_number'     => '%s',
+					'line_data'       => '%s',
+					'subscription_id' => '%d',
+					'amount'          => '%f',
+					'start_date'      => '%s',
+					'end_date'        => '%s',
+				]
+			);
 
-			$period = ( null === $detail->period ) ? null : \Pronamic\Moneybird\Period::from_string( $detail->period );
-
-			foreach ( $subscription_ids as $subscription_id ) {
-				$ids[] = $subscription_id;
-
-				$line_data = [
-					'host'              => 'moneybird.com',
-					'id'                => $sales_invoice->id,
-					'administration_id' => $sales_invoice->administration_id,
-					'contact_id'        => $sales_invoice->contact_id,
-					'draft_id'          => $sales_invoice->draft_id,
-					'detail_id'         => $detail->id,
-				];
-
-				$result = $wpdb->insert(
-					$wpdb->orbis_invoices_lines,
-					[
-						'invoice_id'      => $orbis_invoice_id,
-						'created_at'      => \gmdate( 'Y-m-d H:i:s' ),
-						'line_number'     => $detail->id,
-						'line_data'       => \wp_json_encode( $line_data ),
-						'subscription_id' => $subscription_id,
-						'amount'          => $detail->total_price_excl_tax_with_discount_base,
-						'start_date'      => ( null === $period ) ? null : $period->start_date->format( 'Y-m-d' ),
-						'end_date'        => ( null === $period ) ? null : DateTimeImmutable::createFromInterface( $period->end_date )->modify( '+1 day' )->format( 'Y-m-d' ),
-					],
-					[
-						'invoice_id'      => '%d',
-						'created_at'      => '%s',
-						'line_number'     => '%s',
-						'line_data'       => '%s',
-						'subscription_id' => '%d',
-						'amount'          => '%f',
-						'start_date'      => '%s',
-						'end_date'        => '%s',
-					]
-				);
-
-				if ( false === $result ) {
-					throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database: ' . $wpdb->last_error );
-				}
+			if ( false === $result ) {
+				throw new \Exception( 'An error occurred while inserting the Moneybird sales invoice detail into the Orbis database: ' . $wpdb->last_error );
 			}
 		}
-
-		$wpdb->query(
-			$wpdb->prepare(
-				sprintf(
-					"
-					UPDATE
-						$wpdb->orbis_subscriptions AS subscription
-							INNER JOIN
-						(
-							SELECT
-								subscription.id AS subscription_id,
-								invoice.id AS invoice_id,
-								invoice.created_at AS invoice_created_at,
-								invoice_line.start_date,
-								invoice_line.end_date
-							FROM
-								$wpdb->orbis_subscriptions AS subscription
-									INNER JOIN
-								$wpdb->orbis_invoices_lines AS invoice_line
-										ON invoice_line.subscription_id = subscription.id
-									INNER JOIN
-								$wpdb->orbis_invoices AS invoice
-										ON invoice.id = invoice_line.invoice_id
-									INNER JOIN
-								(
-									SELECT
-										invoice_line.subscription_id,
-										MAX( invoice.created_at ) AS created_at
-									FROM
-										$wpdb->orbis_invoices_lines AS invoice_line
-											INNER JOIN
-										$wpdb->orbis_invoices AS invoice
-												ON invoice.id = invoice_line.invoice_id
-									GROUP BY
-										invoice_line.subscription_id
-								) AS last_invoice
-										ON (
-											last_invoice.subscription_id = invoice_line.subscription_id
-												AND
-											last_invoice.created_at = invoice.created_at
-										)
-
-						) AS subscription_invoice_data
-							ON subscription.id = subscription_invoice_data.subscription_id
-					SET
-						subscription.billed_to = subscription_invoice_data.end_date
-					WHERE
-						subscription.id IN ( %s )
-					;
-					",
-					\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
-				),
-				$ids
-			)
-		);
 	}
-);
+
+	$ids = \array_values( \array_unique( $ids ) );
+
+	if ( 0 === \count( $ids ) ) {
+		return;
+	}
+
+	$wpdb->query(
+		$wpdb->prepare(
+			sprintf(
+				"
+				UPDATE
+					$wpdb->orbis_subscriptions AS subscription
+						INNER JOIN
+					(
+						SELECT
+							subscription.id AS subscription_id,
+							invoice.id AS invoice_id,
+							invoice.created_at AS invoice_created_at,
+							invoice_line.start_date,
+							invoice_line.end_date
+						FROM
+							$wpdb->orbis_subscriptions AS subscription
+								INNER JOIN
+							$wpdb->orbis_invoices_lines AS invoice_line
+									ON invoice_line.subscription_id = subscription.id
+								INNER JOIN
+							$wpdb->orbis_invoices AS invoice
+									ON invoice.id = invoice_line.invoice_id
+								INNER JOIN
+							(
+								SELECT
+									invoice_line.subscription_id,
+									MAX( invoice.created_at ) AS created_at
+								FROM
+									$wpdb->orbis_invoices_lines AS invoice_line
+										INNER JOIN
+									$wpdb->orbis_invoices AS invoice
+											ON invoice.id = invoice_line.invoice_id
+								GROUP BY
+									invoice_line.subscription_id
+							) AS last_invoice
+									ON (
+										last_invoice.subscription_id = invoice_line.subscription_id
+											AND
+										last_invoice.created_at = invoice.created_at
+									)
+
+					) AS subscription_invoice_data
+						ON subscription.id = subscription_invoice_data.subscription_id
+				SET
+					subscription.billed_to = subscription_invoice_data.end_date
+				WHERE
+					subscription.id IN ( %s )
+				;
+				",
+				\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
+			),
+			$ids
+		)
+	);
+}
+
+add_action( 'pronamic_moneybird_sales_invoice_created', 'orbis_moneybird_process_sales_invoice_subscriptions' );
 
 add_filter(
 	'orbis_invoice_url',
