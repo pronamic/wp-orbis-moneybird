@@ -104,7 +104,9 @@ add_action(
 
 		$where .= $wpdb->prepare( ' AND project.id = %d', $project_id );
 
-		$query = "
+		$contacts_table = \Pronamic\Orbis\Contacts\ContactsTable::get_table_name();
+
+		$query = <<<SQL
 			SELECT
 				project.id AS project_id,
 				project.name AS project_name,
@@ -115,9 +117,9 @@ add_action(
 				project.start_date AS project_start_date,
 				manager.ID AS project_manager_id,
 				manager.display_name AS project_manager_name,
-				principal.id AS principal_id,
-				principal.name AS principal_name,
-				principal.post_id AS principal_post_id,
+				customer.id AS customer_id,
+				customer.name AS customer_name,
+				customer.post_id AS customer_post_id,
 				project_invoice_totals.project_billed_time,
 				project_invoice_totals.project_billed_amount,
 				project_invoice_totals.project_invoice_numbers,
@@ -131,8 +133,8 @@ add_action(
 				$wpdb->users AS manager
 						ON project_post.post_author = manager.ID
 					INNER JOIN
-				$wpdb->orbis_companies AS principal
-						ON project.principal_id = principal.id
+				$contacts_table AS customer
+						ON project.customer_id = customer.id
 					LEFT JOIN
 				(
 					SELECT
@@ -163,9 +165,9 @@ add_action(
 			GROUP BY
 				project.id
 			ORDER BY
-				principal.name
+				customer.name
 			;
-		";
+			SQL;
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$item = $wpdb->get_row( $query );
@@ -267,7 +269,7 @@ add_action(
 		 */
 		$previous_project_invoices = $wpdb->get_results(
 			$wpdb->prepare(
-				"
+				<<<SQL
 				SELECT
 					invoice.id,
 					invoice.created_at,
@@ -284,7 +286,7 @@ add_action(
 				GROUP BY
 					invoice.id
 				;
-				",
+				SQL,
 				$project_id
 			)
 		);
@@ -332,7 +334,7 @@ add_action(
 		$subscriptions = $wpdb->get_results(
 			$wpdb->prepare(
 				\sprintf(
-					"
+					<<<SQL
 					SELECT
 						subscription.id,
 						subscription.post_id,
@@ -355,7 +357,7 @@ add_action(
 								ON subscription.product_id = product.id
 					WHERE
 						subscription.id IN ( %s )
-					",
+					SQL,
 					\implode( ', ', \array_fill( 0, count( $subscription_ids ), '%d' ) ),
 				),
 				$subscription_ids
@@ -606,7 +608,7 @@ function orbis_moneybird_process_sales_invoice_projects( $sales_invoice ) {
 	$wpdb->query(
 		$wpdb->prepare(
 			sprintf(
-				"
+				<<<SQL
 				UPDATE
 					$wpdb->orbis_projects AS project
 						INNER JOIN
@@ -651,7 +653,7 @@ function orbis_moneybird_process_sales_invoice_projects( $sales_invoice ) {
 				WHERE
 					project.id IN ( %s )
 				;
-				",
+				SQL,
 				\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
 			),
 			$ids
@@ -666,7 +668,7 @@ function orbis_moneybird_insert_sales_invoice( $sales_invoice ) {
 
 	$orbis_invoice = $wpdb->get_row(
 		$wpdb->prepare(
-			"
+			<<<SQL
 			SELECT
 				invoice.*
 			FROM
@@ -676,7 +678,7 @@ function orbis_moneybird_insert_sales_invoice( $sales_invoice ) {
 			LIMIT
 				1
 			;
-			",
+			SQL,
 			$sales_invoice->id
 		)
 	);
@@ -806,7 +808,7 @@ function orbis_moneybird_process_sales_invoice_subscriptions( $sales_invoice ) {
 	$wpdb->query(
 		$wpdb->prepare(
 			sprintf(
-				"
+				<<<SQL
 				UPDATE
 					$wpdb->orbis_subscriptions AS subscription
 						INNER JOIN
@@ -851,7 +853,7 @@ function orbis_moneybird_process_sales_invoice_subscriptions( $sales_invoice ) {
 				WHERE
 					subscription.id IN ( %s )
 				;
-				",
+				SQL,
 				\implode( ',', \array_fill( 0, \count( $ids ), '%d' ) )
 			),
 			$ids
