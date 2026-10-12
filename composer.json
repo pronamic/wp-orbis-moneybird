@@ -16,14 +16,35 @@
 	},
 	"require-dev": {
 		"pronamic/wp-coding-standards": "^2.1",
-		"pronamic/pronamic-cli": "^1.1",
+		"wp-cli/dist-archive-command": "*",
+		"wp-cli/wp-cli-bundle": "*",
+		"deployer/deployer": "^7.5",
 		"roots/wordpress-no-content": "^6.4"
 	},
 	"scripts": {
-		"build": "vendor/bin/pronamic wp-build",
-		"translate": [
+		"build": [
+			"rm -rf ./build/stage-1",
+			"rm -rf ./build/orbis-moneybird",
+			"rsync --recursive --verbose --exclude-from=.distignore --exclude=/vendor/ ./ ./build/stage-1/",
+			"composer install --no-dev --prefer-dist --optimize-autoloader --working-dir=./build/stage-1/",
+			"rsync --recursive --verbose --exclude-from=.distignore ./build/stage-1/ ./build/orbis-moneybird/",
+			"vendor/bin/wp i18n make-pot ./build/orbis-moneybird/ --slug=orbis-moneybird",
+			"vendor/bin/wp i18n make-mo ./build/orbis-moneybird/languages/",
+			"vendor/bin/wp dist-archive ./build/orbis-moneybird/ --plugin-dirname=orbis-moneybird --force"
+		],
+		"deploy": [
+			"Composer\\Config::disableProcessTimeout",
+			"DEPLOYER_IMPORT=${DEPLOYER_IMPORT:-$HOME/deployer-orbis.php} vendor/bin/dep deploy"
+		],
+		"dist-archive": "wp dist-archive . --plugin-dirname=orbis-moneybird",
+		"make-pot": [
 			"@build",
-			"rsync --recursive --delete --verbose ./build/project/languages/ ./languages/"
+			"rsync --recursive --delete --verbose ./build/orbis-moneybird/languages/ ./languages/",
+			"vendor/bin/wp i18n update-po ./languages/orbis-moneybird.pot"
+		],
+		"phpcs": "vendor/bin/phpcs",
+		"qa": [
+			"@phpcs"
 		]
 	}
 }
