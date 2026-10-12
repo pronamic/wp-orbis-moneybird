@@ -74,24 +74,16 @@ add_action(
 \add_action(
 	'pronamic_moneybird_new_sales_invoice',
 	function ( $sales_invoice ) {
-		global $wpdb;
-
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! \array_key_exists( 'orbis_company_id', $_GET ) ) {
+		if ( ! \array_key_exists( 'orbis_contact_post_id', $_GET ) ) {
 			return;
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$company_id = \sanitize_text_field( \wp_unslash( $_GET['orbis_company_id'] ) );
+		$contact_post_id = \absint( \wp_unslash( $_GET['orbis_contact_post_id'] ) );
 
-		$company = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $wpdb->orbis_companies WHERE id = %d;", $company_id ) );
-
-		if ( null === $company ) {
-			return;
-		}
-
-		$sales_invoice->contact_id = get_post_meta( $company->post_id, '_pronamic_moneybird_contact_id', true );
-		$sales_invoice->reference  = get_post_meta( $company->post_id, '_orbis_invoice_reference', true );
+		$sales_invoice->contact_id = get_post_meta( $contact_post_id, '_pronamic_moneybird_contact_id', true );
+		$sales_invoice->reference  = get_post_meta( $contact_post_id, '_orbis_invoice_reference', true );
 	}
 );
 
